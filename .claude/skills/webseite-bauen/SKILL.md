@@ -50,8 +50,9 @@ Vor dem Bauen recherchieren (WebFetch/`ctx_fetch_and_index` auf die genannte URL
 Einen `Agent`-Tool-Aufruf mit `model: fable`, `subagent_type: general-purpose` starten (bei explizitem Wunsch nach mehreren Varianten: mehrere Aufrufe in einer Nachricht, gleiches Muster, verschiedene `site-<slug>-N/`-Ordner). Der Prompt muss enthalten:
 
 - Zielpfad `site-<slug>/index.html`, Arbeitsverzeichnis = das Projekt-Wurzelverzeichnis (dort wo `scripts/` und `.env` liegen — den absoluten Pfad davon im Dispatch-Prompt mitgeben, nicht raten oder fest verdrahten)
-- Bei echtem Unternehmen: alle recherchierten Fakten wörtlich mitgeben + explizites Fakten-nicht-erfinden-Gebot + Hinweis, ob es eine seriöse Business-Seite (klar lesbare Kernbotschaft, CTA, Kontakt) oder ein freies Kunstprojekt wird
-- Bei freiem Projekt: volle kreative Freiheit, keine Themenvorgabe außer dem Auftrag
+- **Immer volle kreative Freiheit, auch bei echten Unternehmen** — Standard-Modus ist Kunstinstallations-Niveau (3D, Shader, generative Kunst, Audio, Mini-Spiele — wie site-1/site-2/site-3), NICHT eine gebremste "seriöse, klar lesbare Business-Seite". Das gilt unabhängig davon, ob ein echtes Unternehmen referenziert wird oder nicht.
+- Bei echtem Unternehmen zusätzlich: alle recherchierten Fakten (Name, Adresse, Kontakt, Angebot, Logo/Farben) wörtlich mitgeben + explizites Fakten-nicht-erfinden-Gebot. Diese Fakten fließen als Material/Inhalt in die wilde Gestaltung ein (z.B. als Teil einer generativen Szene, Typografie-Experiment, interaktiven Erfahrung) — sie zwingen NICHT zu einem konventionellen, gebremsten Business-Layout.
+- Nur wenn der Auftrag explizit eine "seriöse", "konversions-fokussierte" oder "klassische" Business-Seite verlangt: dann (und nur dann) auf klar lesbare Kernbotschaft/CTA/Kontakt bremsen.
 - `.env` laden: `set -a; source .env; set +a`
 - Werkzeuge: `source scripts/higgsfield.sh && hf_image "<prompt>" "<ratio>"` / `hf_video "<bild-url>" "<prompt>" <sekunden>` — bei `not_enough_credits`-Fehler sofort auf verifizierte Stockfotos (Unsplash/Pexels) ausweichen, nicht wiederholen
 - Screenshot-Check: `node scripts/screenshot.mjs site-<slug>/index.html /tmp/site-<slug>-pass{N}.png`, danach PNG mit Read-Tool ansehen
