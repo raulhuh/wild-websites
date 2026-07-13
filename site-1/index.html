@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TIEFE — Ein Abstieg zum Challenger-Tief</title>
+<meta name="description" content="Ein scrollgesteuerter Abstieg von der Meeresoberfläche bis auf 10.935 Meter. Generative Tiefsee in Echtzeit.">
+<meta property="og:title" content="TIEFE — Ein Abstieg zum Challenger-Tief">
+<meta property="og:description" content="10.935 Meter. Kein Zurück, nur runter. Generative Tiefsee in Echtzeit — WebGL, Canvas, WebAudio.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#031425">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23031425'/%3E%3Ccircle cx='8' cy='8' r='3' fill='%239fd8e8'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,300&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --mono:'IBM Plex Mono', ui-monospace, monospace;
+    --serif:'Fraunces', Georgia, serif;
+    --ink:#dfeaf2;
+    --dim:rgba(223,234,242,.55);
+    --faint:rgba(223,234,242,.28);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:auto}
+  body{
+    background:linear-gradient(to bottom,
+      #0b6d80 0%, #0a4f6e 3%, #073a58 8%, #052a45 14%,
+      #041d33 22%, #031425 32%, #020c1a 45%, #010710 60%,
+      #01040a 78%, #000205 100%);
+    color:var(--ink);
+    font-family:var(--serif);
+    overflow-x:hidden;
+  }
+  canvas#gl,canvas#fx{
+    position:fixed;inset:0;width:100vw;height:100vh;display:block;
+  }
+  canvas#fx{pointer-events:none}
+  #grain{
+    position:fixed;inset:0;pointer-events:none;z-index:40;opacity:.07;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+    mix-blend-mode:overlay;
+  }
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:30;font-family:var(--mono)}
+  .hud-brand{
+    position:absolute;top:28px;left:32px;
+    font-size:12px;letter-spacing:.42em;color:var(--dim);
+    text-transform:uppercase;
+  }
+  .hud-brand b{color:var(--ink);font-weight:500}
+  #audioBtn{
+    position:absolute;top:22px;right:32px;pointer-events:auto;
+    background:none;border:1px solid rgba(223,234,242,.25);color:var(--dim);
+    font-family:var(--mono);font-size:10px;letter-spacing:.28em;text-transform:uppercase;
+    padding:9px 16px;cursor:pointer;transition:all .3s;
+  }
+  #audioBtn:hover{border-color:rgba(223,234,242,.7);color:var(--ink)}
+  #readout{
+    position:absolute;right:32px;top:50%;transform:translateY(-50%);
+    text-align:right;transition:opacity 1.2s;
+  }
+  #depthNum{
+    font-size:clamp(34px,4.2vw,58px);font-weight:300;letter-spacing:.02em;
+    color:var(--ink);font-variant-numeric:tabular-nums;line-height:1;
+  }
+  #depthNum small{font-size:.42em;color:var(--dim);letter-spacing:.2em;margin-left:.3em}
+  .gauges{margin-top:22px;display:flex;flex-direction:column;gap:11px;align-items:flex-end}
+  .gauge{font-size:10px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase;display:flex;align-items:center;gap:12px}
+  .gauge .val{color:var(--ink);font-variant-numeric:tabular-nums;min-width:86px;text-align:right}
+  .bar{width:72px;height:2px;background:rgba(223,234,242,.14);position:relative;overflow:hidden}
+  .bar i{position:absolute;left:0;top:0;bottom:0;background:rgba(223,234,242,.75);width:0%}
+  #zoneLabel{
+    position:absolute;left:34px;top:50%;transform:translateY(-50%) rotate(180deg);
+    writing-mode:vertical-rl;
+    font-size:11px;letter-spacing:.5em;text-transform:uppercase;color:var(--faint);
+    transition:color .8s;
+  }
+  #progress{
+    position:absolute;right:12px;top:12vh;bottom:12vh;width:1px;
+    background:rgba(223,234,242,.12);
+  }
+  #progress i{position:absolute;top:0;left:-1px;width:3px;background:var(--ink);height:0%}
+  #hint{
+    position:absolute;bottom:34px;left:50%;transform:translateX(-50%);
+    font-size:10px;letter-spacing:.4em;text-transform:uppercase;color:var(--dim);
+    display:flex;flex-direction:column;align-items:center;gap:14px;
+    transition:opacity .6s;
+  }
+  #hint .line{width:1px;height:38px;background:linear-gradient(to bottom,transparent,var(--dim));animation:drop 2.2s ease-in-out infinite}
+  @keyframes drop{0%{transform:scaleY(.2);transform-origin:top;opacity:0}45%{transform:scaleY(1);opacity:1}100%{transform:scaleY(1);transform-origin:top;opacity:0}}
+
+  /* ---------- Welt / Scroll-Inhalt ---------- */
+  #world{position:relative;z-index:20;pointer-events:none}
+  .card{
+    position:absolute;max-width:420px;pointer-events:auto;
+    padding:26px 30px;
+    background:rgba(2,8,16,.32);
+    border-left:1px solid rgba(223,234,242,.3);
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    opacity:0;transform:translateY(34px);
+    transition:opacity 1.1s cubic-bezier(.2,.6,.2,1),transform 1.1s cubic-bezier(.2,.6,.2,1);
+  }
+  .card.vis{opacity:1;transform:translateY(0)}
+  .card .m{
+    font-family:var(--mono);font-size:11px;letter-spacing:.3em;color:var(--dim);
+    text-transform:uppercase;margin-bottom:12px;
+  }
+  .card .m b{color:var(--ink);font-weight:500}
+  .card p{
+    font-size:clamp(17px,1.5vw,21px);font-weight:300;line-height:1.55;
+    color:var(--ink);
+  }
+  .card p em{font-style:italic;color:#9fd8e8}
+  .card.left{left:8vw}
+  .card.right{right:27vw}
+  .zone{
+    position:absolute;left:0;right:0;text-align:center;
+    font-family:var(--mono);
+    font-size:clamp(11px,1vw,13px);letter-spacing:1.4em;text-indent:1.4em;
+    text-transform:uppercase;color:var(--faint);
+    opacity:0;transform:none;transition:opacity 1.4s;
+  }
+  .zone.vis{opacity:1}
+  .tick{
+    position:absolute;left:8vw;display:flex;align-items:center;gap:14px;
+    font-family:var(--mono);font-size:10px;letter-spacing:.26em;
+    color:var(--faint);white-space:nowrap;
+    opacity:0;transition:opacity 1.2s;
+  }
+  .tick::before{content:'';display:block;width:42px;height:1px;background:rgba(223,234,242,.22)}
+  .tick.vis{opacity:1}
+  .zone .big{
+    display:block;margin-top:14px;
+    font-family:var(--serif);font-weight:300;font-style:italic;
+    font-size:clamp(38px,6vw,86px);letter-spacing:.04em;text-indent:0;
+    color:transparent;-webkit-text-stroke:1px rgba(159,216,232,.35);
+    text-transform:none;
+  }
+
+  /* ---------- Intro ---------- */
+  #intro{
+    position:fixed;inset:0;z-index:25;pointer-events:none;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;
+  }
+  #intro .kicker{
+    font-family:var(--mono);font-size:11px;letter-spacing:.6em;text-indent:.6em;
+    text-transform:uppercase;color:var(--dim);margin-bottom:3vh;
+  }
+  #intro h1{
+    font-weight:300;font-size:clamp(72px,17vw,240px);line-height:.9;
+    letter-spacing:.12em;text-indent:.12em;color:var(--ink);
+    text-shadow:0 0 80px rgba(20,120,150,.5);
+  }
+  #intro .sub{
+    margin-top:3.4vh;font-style:italic;font-weight:300;
+    font-size:clamp(16px,2vw,24px);color:var(--dim);
+  }
+  #intro .coords{
+    margin-top:2.2vh;font-family:var(--mono);font-size:10px;
+    letter-spacing:.34em;color:var(--faint);text-transform:uppercase;
+  }
+
+  /* ---------- Ende ---------- */
+  #ende{
+    position:fixed;inset:0;z-index:26;pointer-events:none;opacity:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;transition:opacity 1.6s;
+  }
+  #ende.vis{opacity:1;pointer-events:auto}
+  #ende .m{font-family:var(--mono);font-size:11px;letter-spacing:.5em;text-indent:.5em;color:var(--dim);text-transform:uppercase}
+  #ende h2{
+    margin-top:3vh;font-weight:300;font-size:clamp(28px,4.4vw,58px);line-height:1.25;
+    max-width:20em;
+  }
+  #ende h2 em{font-style:italic;color:#9fd8e8}
+  #ende .fact{margin-top:2.6vh;font-family:var(--mono);font-size:12px;letter-spacing:.2em;color:var(--dim)}
+  #ende .credit{
+    position:absolute;bottom:26px;left:0;right:0;text-align:center;
+    font-family:var(--mono);font-size:10px;letter-spacing:.24em;color:var(--faint);
+  }
+  #surfaceBtn{
+    margin-top:6vh;pointer-events:auto;cursor:pointer;
+    background:none;border:1px solid rgba(223,234,242,.4);color:var(--ink);
+    font-family:var(--mono);font-size:11px;letter-spacing:.4em;text-indent:.4em;
+    text-transform:uppercase;padding:16px 34px;transition:all .35s;
+  }
+  #surfaceBtn:hover{background:rgba(223,234,242,.1);border-color:var(--ink)}
+
+  @media (max-width:720px){
+    .card.left{left:6vw}
+    .card.right{right:6vw;left:auto}
+    .card{max-width:82vw}
+    #readout{right:18px;top:auto;bottom:24px;transform:none}
+    #depthNum{font-size:30px}
+    .gauges{margin-top:12px;gap:7px}
+    #zoneLabel{left:10px}
+    .hud-brand{left:18px}
+    .brand-sub{display:none}
+    .tick{display:none}
+    #hint{bottom:110px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    #hint .line{animation:none}
+    .card{transition:opacity .4s;transform:none}
+  }
+</style>
+</head>
+<body>
+
+<canvas id="gl"></canvas>
+<canvas id="fx"></canvas>
+<div id="grain"></div>
+
+<div id="hud">
+  <div class="hud-brand"><b>TIEFE</b><span class="brand-sub"> — ein Abstieg</span></div>
+  <button id="audioBtn" aria-label="Ton umschalten">Ton: aus</button>
+  <div id="readout">
+    <div id="depthNum">0<small>M</small></div>
+    <div class="gauges">
+      <div class="gauge"><span>Druck</span><span class="bar"><i id="bPress"></i></span><span class="val" id="vPress">1,0 bar</span></div>
+      <div class="gauge"><span>Temp</span><span class="bar"><i id="bTemp"></i></span><span class="val" id="vTemp">21,0 °C</span></div>
+      <div class="gauge"><span>Licht</span><span class="bar"><i id="bLight"></i></span><span class="val" id="vLight">100 %</span></div>
+    </div>
+  </div>
+  <div id="zoneLabel">Oberfläche</div>
+  <div id="progress"><i id="progFill"></i></div>
+  <div id="hint"><span>Scrollen, um abzutauchen</span><span class="line"></span></div>
+</div>
+
+<div id="intro">
+  <div class="kicker">Marianengraben · Westpazifik</div>
+  <h1>TIEFE</h1>
+  <div class="sub">Ein Abstieg. 10.935 Meter. Kein Zurück, nur runter.</div>
+  <div class="coords">11°22′N&ensp;142°35′E</div>
+</div>
+
+<div id="ende">
+  <div class="m">10.935 m · Challenger-Tief · Grund erreicht</div>
+  <h2>Der Mond ist besser kartiert<br>als <em>dieser Ort</em>.</h2>
+  <div class="fact">Druck hier unten: 1.094 bar — das Gewicht eines Kleinwagens auf jedem Quadratzentimeter.</div>
+  <button id="surfaceBtn">Auftauchen</button>
+  <div class="credit">Alles auf dieser Seite ist generativ — WebGL · Canvas · WebAudio. Kein einziges Bild.</div>
+</div>
+
+<div id="world"></div>
+
+<script>
+'use strict';
+/* ============================================================
+   TIEFE — generativer Tiefsee-Abstieg
+   Raw WebGL Shader + 2D-Kreaturen-Engine + WebAudio
+   ============================================================ */
+
+const MAX_DEPTH = 10935;        // Meter
+const PX_PER_M  = 2;            // Scroll-Auflösung
+const clamp = (v,a,b)=>Math.min(b,Math.max(a,v));
+const lerp  = (a,b,t)=>a+(b-a)*t;
+const fmt   = n => Math.round(n).toLocaleString('de-DE');
+
+/* ---------- Scroll-Welt aufbauen ---------- */
+/* Erster Viewport = Vorlauf an der Oberfläche, danach beginnt der Abstieg */
+const world = document.getElementById('world');
+world.style.height = (MAX_DEPTH*PX_PER_M + innerHeight*2) + 'px';
+
+const ZONES = [
+  {d:0,    name:'Epipelagial',   sub:'Die lichtdurchflutete Zone'},
+  {d:200,  name:'Mesopelagial',  sub:'Die Dämmerzone'},
+  {d:1000, name:'Bathypelagial', sub:'Die Mitternachtszone'},
+  {d:4000, name:'Abyssopelagial',sub:'Die Zone des Abgrunds'},
+  {d:6000, name:'Hadopelagial',  sub:'Die Unterwelt'},
+];
+const FACTS = [
+  {d:40,   side:'left',  t:'Grenze des Sporttauchens', p:'Weiter geht es für Hobbytaucher nicht. Alles darunter gehört den Profis — <em>und den Tieren</em>.'},
+  {d:100,  side:'right', t:'Die Farbe Rot existiert nicht mehr', p:'Das Wasser hat sie verschluckt. Blut sieht hier <em>grün</em> aus.'},
+  {d:253,  side:'left',  t:'Der tiefste Atemzug der Welt', p:'Herbert Nitsch, 2012: 253 Meter mit einem einzigen Atemzug. No-Limits-Freitauchen — <em>ohne Gerät, ohne Luft</em>.'},
+  {d:332,  side:'right', t:'Weltrekord im Gerätetauchen', p:'Ahmed Gabr, 2014. Abstieg: 12 Minuten. Aufstieg: <em>fast 15 Stunden</em> — sonst kocht das Blut.'},
+  {d:535,  side:'left',  t:'Kaiserpinguine jagen hier', p:'Über 500 Meter tief, bis zu 20 Minuten mit einem Atemzug. <em>Ein Vogel.</em>'},
+  {d:830,  side:'right', t:'Hier beginnt das eigene Licht', p:'Wo die Sonne aufgibt, übernehmen die Tiere: <em>Biolumineszenz</em> — Licht aus Chemie. Bewege die Maus.'},
+  {d:1280, side:'left',  t:'Lederschildkröten-Territorium', p:'Ein Reptil, das tiefer taucht als jedes U-Boot des Zweiten Weltkriegs.'},
+  {d:2000, side:'right', t:'Ewige Mitternacht', p:'Seit Millionen Jahren hat hier kein einziges Photon der Sonne den Boden berührt.'},
+  {d:2992, side:'left',  t:'Der tiefste Tauchgang eines Säugetiers', p:'Ein Cuvier-Schnabelwal, gemessen 2014: 2.992 Meter. <em>Mit Lungen wie du.</em>'},
+  {d:3803, side:'right', t:'Die Titanic liegt hier', p:'Seit 1912. Der Rost frisst sie langsam auf — in wenigen Jahrzehnten ist sie <em>verschwunden</em>.'},
+  {d:4800, side:'left',  t:'Anglerfisch-Revier', p:'Eine leuchtende Angel im Nichts. Wer neugierig wird, <em>wird gefressen</em>.'},
+  {d:6000, side:'right', t:'Ab hier: Hadal', p:'Benannt nach Hades, dem Gott der Unterwelt. Weniger als ein Dutzend Tauchboote der Geschichte kamen je hierher.'},
+  {d:8849, side:'left',  t:'Der Mount Everest — kopfüber', p:'Würde man ihn hier versenken, läge sein Gipfel an dieser Stelle. Darüber: <em>immer noch 2 Kilometer Wasser</em>.'},
+  {d:9700, side:'right', t:'Trieste, 1960', p:'Jacques Piccard und Don Walsh — die ersten Menschen ganz unten. Beim Abstieg bekam das Fenster <em>einen Riss</em>. Sie tauchten trotzdem weiter.'},
+  {d:10500,side:'left',  t:'Fast unten', p:'Selbst hier lebt etwas: Flohkrebse, Seegurken, Mikroben. <em>Das Leben gibt nicht auf.</em>'},
+];
+
+function buildWorld(){
+  world.innerHTML='';
+  ZONES.forEach(z=>{
+    if(z.d===0) return;
+    const el=document.createElement('div');
+    el.className='zone';
+    el.style.top=(z.d*PX_PER_M + innerHeight*1.35)+'px';
+    el.innerHTML=`${z.d.toLocaleString('de-DE')} m — ${z.name}<span class="big">${z.sub}</span>`;
+    world.appendChild(el);
+  });
+  /* Tiefen-Ruler: alle 1.000 m eine feine Marke */
+  for(let d=1000;d<MAX_DEPTH;d+=1000){
+    if(ZONES.some(z=>z.d===d)) continue;           // Zonengrenzen haben eigene Titel
+    const el=document.createElement('div');
+    el.className='tick';
+    el.style.top=(d*PX_PER_M + innerHeight*1.5)+'px';
+    el.textContent='− '+d.toLocaleString('de-DE')+' m';
+    world.appendChild(el);
+  }
+  FACTS.forEach(f=>{
+    const el=document.createElement('div');
+    el.className='card '+f.side;
+    el.style.top=(f.d*PX_PER_M + innerHeight*1.42)+'px';
+    el.innerHTML=`<div class="m">— <b>${fmt(f.d)} m</b></div><p><strong style="font-weight:600">${f.t}.</strong> ${f.p}</p>`;
+    world.appendChild(el);
+  });
+  const io=new IntersectionObserver(es=>es.forEach(e=>{
+    e.target.classList.toggle('vis',e.isIntersecting);
+  }),{threshold:0.2,rootMargin:'-7% 0px -7% 0px'});
+  world.querySelectorAll('.card,.zone,.tick').forEach(el=>io.observe(el));
+}
+buildWorld();
+
+/* ---------- Zustand ---------- */
+let depth=0, smoothDepth=0, scrollV=0, lastScroll=0;
+let mouse={x:innerWidth/2,y:innerHeight/2,active:0};
+addEventListener('mousemove',e=>{
+  const dx=e.clientX-mouse.x, dy=e.clientY-mouse.y;
+  mouse.x=e.clientX; mouse.y=e.clientY; mouse.active=1;
+  spawnPlankton(e.clientX,e.clientY,Math.hypot(dx,dy));
+});
+
+/* ---------- WebGL Hintergrund-Shader ---------- */
+const glc=document.getElementById('gl');
+const gl=glc.getContext('webgl',{antialias:false,depth:false});
+let prog=null,uni={};
+const VSH=`attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}`;
+const FSH=`
+precision highp float;
+uniform vec2 uRes;uniform float uTime;uniform float uDepth;
+uniform float uScroll;uniform vec2 uMouse;uniform float uLight;
+float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);}
+float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+  return mix(mix(hash(i),hash(i+vec2(1.,0.)),f.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.,1.)),f.x),f.y);}
+vec3 water(float d){
+  vec3 c0=vec3(0.055,0.44,0.52);
+  vec3 c1=vec3(0.012,0.17,0.31);
+  vec3 c2=vec3(0.005,0.055,0.15);
+  vec3 c3=vec3(0.002,0.016,0.055);
+  vec3 c4=vec3(0.001,0.004,0.016);
+  vec3 c=mix(c0,c1,smoothstep(0.,160.,d));
+  c=mix(c,c2,smoothstep(160.,650.,d));
+  c=mix(c,c3,smoothstep(650.,2200.,d));
+  c=mix(c,c4,smoothstep(2200.,6500.,d));
+  return c;
+}
+void main(){
+  vec2 uv=gl_FragCoord.xy/uRes;
+  float d=uDepth;
+  vec3 col=water(d+(1.-uv.y)*60.);
+
+  /* Taucherlampe: Maus wird zur Lichtquelle in der Tiefe */
+  vec2 mpx=(gl_FragCoord.xy-vec2(uMouse.x,uRes.y-uMouse.y))/uRes.y;
+  float mdist=length(mpx);
+  float lamp=exp(-mdist*4.2)*smoothstep(250.,900.,d)*uLight;
+  col+=vec3(0.10,0.20,0.26)*lamp;
+
+  /* Sonnenstrahlen nahe der Oberfläche */
+  float sun=exp(-d/85.);
+  if(sun>0.004){
+    float ax=(uv.x-0.5)/(0.35+uv.y*0.65);
+    float ray=noise(vec2(ax*10.+uTime*0.11,uTime*0.05));
+    ray=pow(ray,3.5)*smoothstep(0.,1.,uv.y*0.85+0.15);
+    float caust=noise(uv*vec2(9.,4.)+vec2(uTime*.25,uTime*.11));
+    caust=pow(caust,4.)*smoothstep(.55,1.,uv.y);
+    col+=vec3(0.38,0.78,0.82)*(ray*0.9+caust*0.6)*sun;
+  }
+
+  /* Meeresschnee: 3 Parallax-Ebenen */
+  float snow=0.;
+  for(int i=0;i<3;i++){
+    float fi=float(i);
+    float sc=52.+fi*44.;
+    vec2 p=gl_FragCoord.xy/uRes.y;
+    p.y+=uScroll*(0.00045+fi*0.00042);
+    p.y+=uTime*(0.006+fi*0.004);
+    p.x+=sin(uTime*0.1+fi*2.1)*0.01;
+    vec2 id=floor(p*sc),f=fract(p*sc);
+    float h=hash(id);
+    if(h>0.78){
+      vec2 pp=vec2(hash(id+7.3),hash(id+3.1));
+      float dist=length(f-pp);
+      float s=smoothstep(0.10+h*0.06,0.,dist);
+      snow+=s*(0.10+fi*0.06);
+    }
+  }
+  float snowVis=0.35+lamp*3.0+sun*1.4;
+  col+=vec3(0.75,0.85,0.92)*snow*snowVis;
+
+  /* Biolumineszenz in der Tiefe */
+  float bio=smoothstep(650.,1400.,d);
+  if(bio>0.01){
+    vec2 p=gl_FragCoord.xy/uRes.y;
+    p.y+=uScroll*0.0006;
+    float sc=7.5;
+    vec2 id=floor(p*sc),f=fract(p*sc);
+    float h=hash(id*1.7);
+    if(h>0.62){
+      vec2 pp=vec2(hash(id+11.2),hash(id+5.7));
+      float dist=length(f-pp);
+      float pulse=0.5+0.5*sin(uTime*(0.6+h*2.2)+h*40.);
+      float g=exp(-dist*22.)*pulse;
+      vec3 bcol=mix(vec3(0.15,0.85,0.72),vec3(0.35,0.5,0.95),hash(id+2.2));
+      col+=bcol*g*bio*0.55;
+    }
+  }
+
+  /* Vignette + leichtes Dithering gegen Banding */
+  float vig=1.-0.5*pow(length(uv-0.5)*1.15,1.9);
+  col*=vig;
+  col+=(hash(gl_FragCoord.xy+fract(uTime))-0.5)*0.012;
+  gl_FragColor=vec4(col,1.);
+}`;
+function makeShader(type,src){
+  const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);
+  return s;
+}
+if(gl){
+  prog=gl.createProgram();
+  gl.attachShader(prog,makeShader(gl.VERTEX_SHADER,VSH));
+  gl.attachShader(prog,makeShader(gl.FRAGMENT_SHADER,FSH));
+  gl.linkProgram(prog);gl.useProgram(prog);
+  const buf=gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+  const loc=gl.getAttribLocation(prog,'p');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+  ['uRes','uTime','uDepth','uScroll','uMouse','uLight'].forEach(n=>uni[n]=gl.getUniformLocation(prog,n));
+}
+
+/* ---------- 2D-Kreaturen-Engine ---------- */
+const fxc=document.getElementById('fx');
+const fx=fxc.getContext('2d');
+const DPR=Math.min(devicePixelRatio||1,1.5);
+function resize(){
+  glc.width=innerWidth*DPR;glc.height=innerHeight*DPR;
+  fxc.width=innerWidth*DPR;fxc.height=innerHeight*DPR;
+  if(gl)gl.viewport(0,0,glc.width,glc.height);
+  fx.setTransform(DPR,0,0,DPR,0,0);
+  world.style.height=(MAX_DEPTH*PX_PER_M+innerHeight*2)+'px';
+}
+addEventListener('resize',resize);resize();
+
+/* Sichtbarkeit: Kreatur lebt auf einer Welt-Tiefe, Y folgt dem Scroll */
+function worldY(cd){ return (cd - smoothDepth)*PX_PER_M + innerHeight*0.5; }
+function visAt(cd,margin){ const y=worldY(cd); return y>-margin && y<innerHeight+margin; }
+
+/* Fische (Schwarm, 15–220 m) */
+const fishes=[];
+for(let i=0;i<26;i++){
+  const cluster=Math.floor(i/9);            // drei lose Schwärme
+  fishes.push({
+    cd:30+cluster*60+Math.random()*55,
+    x:Math.random()*innerWidth,
+    dir:cluster%2===0?1:-1,
+    sp:0.6+Math.random()*1.0,
+    size:11+Math.random()*15,
+    ph:Math.random()*Math.PI*2,
+    wob:0.4+Math.random()*0.7,
+  });
+}
+function drawFish(t){
+  fishes.forEach(f=>{
+    if(!visAt(f.cd,80))return;
+    f.x+=f.dir*f.sp;
+    if(f.x>innerWidth+60)f.x=-60;
+    if(f.x<-60)f.x=innerWidth+60;
+    const y=worldY(f.cd)+Math.sin(t*f.wob+f.ph)*14;
+    const a=clamp(1-smoothDepth/320,0,1)*0.75;
+    if(a<=0.01)return;
+    fx.save();fx.translate(f.x,y);fx.scale(f.dir,1);
+    fx.fillStyle=`rgba(2,14,24,${a})`;
+    fx.beginPath();
+    const s=f.size, tail=Math.sin(t*6*f.wob+f.ph)*s*0.22;
+    fx.moveTo(s,0);
+    fx.quadraticCurveTo(0,-s*0.42,-s*0.85,tail*0.3);
+    fx.lineTo(-s*1.35,-s*0.42+tail);
+    fx.lineTo(-s*1.05,tail*0.4);
+    fx.lineTo(-s*1.35,s*0.42+tail);
+    fx.lineTo(-s*0.85,tail*0.3);
+    fx.quadraticCurveTo(0,s*0.42,s,0);
+    fx.fill();fx.restore();
+  });
+}
+
+/* Quallen (280–1000 m) */
+const jellies=[];
+for(let i=0;i<7;i++){
+  jellies.push({
+    cd:300+i*95+Math.random()*50,
+    x:(0.12+Math.random()*0.76),
+    size:26+Math.random()*36,
+    ph:Math.random()*Math.PI*2,
+    hue:Math.random(),
+    drift:(Math.random()-0.5)*0.15,
+  });
+}
+function drawJelly(t){
+  jellies.forEach(j=>{
+    if(!visAt(j.cd,160))return;
+    const pulse=Math.sin(t*1.3+j.ph);
+    const y=worldY(j.cd)+Math.sin(t*0.4+j.ph)*20 - pulse*6;
+    const x=j.x*innerWidth+Math.sin(t*0.22+j.ph*2)*36;
+    const s=j.size, squash=1+pulse*0.14;
+    const col=j.hue<0.5?'150,200,255':'190,150,255';
+    fx.save();fx.translate(x,y);
+    fx.shadowColor=`rgba(${col},0.8)`;fx.shadowBlur=26;
+    /* Glocke */
+    fx.fillStyle=`rgba(${col},0.22)`;
+    fx.strokeStyle=`rgba(${col},0.5)`;fx.lineWidth=1.2;
+    fx.beginPath();
+    fx.ellipse(0,0,s*squash,s*0.72/squash,0,Math.PI,0);
+    fx.quadraticCurveTo(s*squash*0.7,s*0.28,0,s*0.2);
+    fx.quadraticCurveTo(-s*squash*0.7,s*0.28,-s*squash,0);
+    fx.fill();fx.stroke();
+    /* Tentakel */
+    fx.shadowBlur=0;
+    fx.strokeStyle=`rgba(${col},0.32)`;fx.lineWidth=1;
+    for(let k=0;k<5;k++){
+      const ox=(k/4-0.5)*s*1.2;
+      fx.beginPath();fx.moveTo(ox,s*0.18);
+      for(let seg=1;seg<=6;seg++){
+        const yy=s*0.18+seg*s*0.32;
+        const xx=ox+Math.sin(t*2+j.ph+seg*0.9+k)*s*0.14*seg/6*(1+pulse*0.3);
+        fx.lineTo(xx,yy);
+      }
+      fx.stroke();
+    }
+    fx.restore();
+  });
+}
+
+/* Pottwal (um 2.400 m) — zieht langsam vorbei */
+const whale={cd:2450,ph:Math.random()*6};
+function drawWhale(t){
+  if(!visAt(whale.cd,420))return;
+  const w=innerWidth,s=210;
+  const travel=(t*22+whale.ph*300)%(w+s*5)-s*2.5;
+  const y=worldY(whale.cd)+Math.sin(t*0.3+whale.ph)*24;
+  fx.save();fx.translate(travel,y);
+  fx.fillStyle='rgba(2,6,12,0.9)';
+  fx.strokeStyle='rgba(130,180,210,0.42)';fx.lineWidth=1.8;
+  fx.shadowColor='rgba(80,145,185,0.55)';fx.shadowBlur=34;
+  const fl=Math.sin(t*1.1+whale.ph)*s*0.10;   // Flukenschlag
+  fx.beginPath();
+  /* Stumpfer Kopf rechts, Körper nach links, Fluke */
+  fx.moveTo(s*1.05,-s*0.16);
+  fx.quadraticCurveTo(s*1.28,-s*0.02,s*1.12,s*0.16);   // Schnauze
+  fx.quadraticCurveTo(s*0.5,s*0.30,-s*0.35,s*0.16);    // Bauch
+  fx.quadraticCurveTo(-s*0.9,s*0.06,-s*1.18,fl*0.4);   // Schwanzstiel
+  fx.lineTo(-s*1.5,s*0.24+fl);                         // Fluke unten
+  fx.quadraticCurveTo(-s*1.28,fl*0.3,-s*1.5,-s*0.24+fl); // Fluke oben
+  fx.lineTo(-s*1.18,fl*0.4-s*0.03);
+  fx.quadraticCurveTo(-s*0.4,-s*0.26,s*0.5,-s*0.28);   // Rücken
+  fx.quadraticCurveTo(s*0.92,-s*0.27,s*1.05,-s*0.16);
+  fx.fill();fx.stroke();
+  fx.shadowBlur=0;
+  /* Brustflosse */
+  fx.beginPath();
+  fx.moveTo(s*0.45,s*0.2);
+  fx.quadraticCurveTo(s*0.3,s*0.5,s*0.05,s*0.52);
+  fx.quadraticCurveTo(s*0.28,s*0.28,s*0.38,s*0.16);
+  fx.fill();
+  /* Auge: winziger heller Punkt */
+  fx.fillStyle='rgba(160,200,220,0.30)';
+  fx.beginPath();fx.arc(s*0.88,s*0.02,2.4,0,7);fx.fill();
+  fx.restore();
+}
+
+/* Anglerfisch (4.500–5.200 m) */
+const angler={cd:4800,x:innerWidth*0.5,tx:innerWidth*0.5};
+function drawAngler(t){
+  if(!visAt(angler.cd,220))return;
+  angler.tx=lerp(angler.tx,mouse.x,0.004);
+  angler.x=lerp(angler.x,angler.tx,0.05);
+  const y=worldY(angler.cd)+Math.sin(t*0.5)*18;
+  const flick=(Math.sin(t*7)*0.5+0.5)*(Math.sin(t*1.7)*0.5+0.5);
+  const s=54;
+  fx.save();fx.translate(angler.x,y);
+  const dir=angler.tx>angler.x?1:-1; fx.scale(dir,1);
+  /* Körper: kaum sichtbar */
+  fx.fillStyle='rgba(4,8,14,0.85)';
+  fx.beginPath();
+  fx.moveTo(s,0);
+  fx.quadraticCurveTo(s*0.3,-s*0.62,-s*0.7,-s*0.28);
+  fx.quadraticCurveTo(-s*1.15,0,-s*0.7,s*0.34);
+  fx.quadraticCurveTo(s*0.3,s*0.62,s,0);
+  fx.fill();
+  /* Zähne angedeutet */
+  fx.strokeStyle='rgba(140,170,190,0.25)';fx.lineWidth=1;
+  fx.beginPath();fx.moveTo(s*0.92,-s*0.06);fx.lineTo(s*0.55,-s*0.02);fx.stroke();
+  /* Angel + Lure */
+  fx.strokeStyle='rgba(120,160,180,0.3)';
+  fx.beginPath();fx.moveTo(s*0.2,-s*0.5);
+  fx.quadraticCurveTo(s*0.85,-s*1.15,s*1.15,-s*0.72);
+  fx.stroke();
+  const lr=44+flick*26;
+  const g=fx.createRadialGradient(s*1.15,-s*0.72,0,s*1.15,-s*0.72,lr);
+  g.addColorStop(0,`rgba(200,255,242,${0.95*flick+0.18})`);
+  g.addColorStop(0.22,`rgba(100,230,205,${0.55*flick+0.10})`);
+  g.addColorStop(1,'rgba(90,220,200,0)');
+  fx.fillStyle=g;
+  fx.beginPath();fx.arc(s*1.15,-s*0.72,lr,0,7);fx.fill();
+  fx.fillStyle=`rgba(235,255,250,${0.7+0.3*flick})`;
+  fx.shadowColor='rgba(160,255,235,0.9)';fx.shadowBlur=18;
+  fx.beginPath();fx.arc(s*1.15,-s*0.72,3.2,0,7);fx.fill();
+  fx.shadowBlur=0;
+  fx.restore();
+}
+
+/* Riesenkalmar (6.400–7.400 m) — riesige, langsame Silhouette */
+const squid={cd:6900};
+function drawSquid(t){
+  if(!visAt(squid.cd,500))return;
+  const y=worldY(squid.cd)+Math.sin(t*0.18)*30;
+  const x=innerWidth*0.62+Math.cos(t*0.12)*60;
+  const s=170;
+  fx.save();fx.translate(x,y);fx.rotate(-0.5+Math.sin(t*0.1)*0.06);
+  fx.fillStyle='rgba(3,7,13,0.72)';
+  fx.strokeStyle='rgba(90,130,160,0.14)';fx.lineWidth=1.5;
+  /* Mantel */
+  fx.beginPath();
+  fx.moveTo(0,-s);
+  fx.quadraticCurveTo(s*0.42,-s*0.35,s*0.3,0.20*s);
+  fx.quadraticCurveTo(0,s*0.42,-s*0.3,0.20*s);
+  fx.quadraticCurveTo(-s*0.42,-s*0.35,0,-s);
+  fx.fill();fx.stroke();
+  /* Flossen */
+  fx.beginPath();fx.moveTo(0,-s);
+  fx.quadraticCurveTo(s*0.75,-s*1.02,0.08*s,-s*0.55);fx.fill();
+  fx.beginPath();fx.moveTo(0,-s);
+  fx.quadraticCurveTo(-s*0.75,-s*1.02,-0.08*s,-s*0.55);fx.fill();
+  /* Auge */
+  fx.fillStyle='rgba(140,190,210,0.28)';
+  fx.beginPath();fx.arc(s*0.13,s*0.1,s*0.075,0,7);fx.fill();
+  /* Tentakel */
+  fx.strokeStyle='rgba(3,7,13,0.72)';
+  for(let k=0;k<8;k++){
+    const ox=(k/7-0.5)*s*0.5;
+    const len=(k===2||k===5)?s*2.3:s*1.4;
+    fx.lineWidth=5-Math.abs(k/7-0.5)*4;
+    fx.beginPath();fx.moveTo(ox,s*0.3);
+    for(let seg=1;seg<=7;seg++){
+      const yy=s*0.3+seg*len/7;
+      const xx=ox*(1+seg*0.25)+Math.sin(t*0.7+k*1.3+seg*0.8)*s*0.06*seg/7*8;
+      fx.lineTo(xx,yy);
+    }
+    fx.stroke();
+  }
+  fx.restore();
+}
+
+/* Plankton-Funken bei Mausbewegung in der Tiefe */
+const sparks=[];
+function spawnPlankton(x,y,v){
+  if(smoothDepth<700||v<2)return;
+  if(sparks.length>140)return;
+  const n=Math.min(3,Math.floor(v/8)+1);
+  for(let i=0;i<n;i++){
+    sparks.push({
+      x:x+(Math.random()-0.5)*24,y:y+(Math.random()-0.5)*24,
+      vx:(Math.random()-0.5)*1.4,vy:(Math.random()-0.5)*1.4-0.3,
+      life:1,decay:0.008+Math.random()*0.015,
+      hue:Math.random(),r:1+Math.random()*2.2,
+    });
+  }
+}
+function drawSparks(){
+  for(let i=sparks.length-1;i>=0;i--){
+    const s=sparks[i];
+    s.x+=s.vx;s.y+=s.vy;s.vx*=0.985;s.vy*=0.985;s.life-=s.decay;
+    if(s.life<=0){sparks.splice(i,1);continue;}
+    const col=s.hue<0.6?'110,240,210':'130,170,255';
+    fx.fillStyle=`rgba(${col},${s.life*0.85})`;
+    fx.shadowColor=`rgba(${col},${s.life})`;fx.shadowBlur=8;
+    fx.beginPath();fx.arc(s.x,s.y,s.r,0,7);fx.fill();
+    fx.shadowBlur=0;
+  }
+}
+
+/* ---------- Meeresboden: das Challenger-Tief ---------- */
+const FLOOR_D=MAX_DEPTH+55;                 // Weltposition der Sedimentkante
+const rocks=[];
+for(let i=0;i<14;i++)rocks.push({x:Math.random(),w:22+Math.random()*70,h:7+Math.random()*20});
+const pods=[];
+for(let i=0;i<9;i++)pods.push({x:Math.random()*innerWidth,v:0,ph:Math.random()*9,next:0});
+function ridgeY(x,base){
+  return base+Math.sin(x*0.008)*10+Math.sin(x*0.023+2.1)*5+Math.sin(x*0.0031+0.7)*16;
+}
+function drawFloor(t){
+  const base=worldY(FLOOR_D);
+  if(base>innerHeight+150)return;
+  /* Sediment-Dunst über dem Grund */
+  const haze=fx.createLinearGradient(0,base-130,0,base);
+  haze.addColorStop(0,'rgba(30,42,56,0)');
+  haze.addColorStop(1,'rgba(30,42,56,0.16)');
+  fx.fillStyle=haze;fx.fillRect(0,base-130,innerWidth,130);
+  /* Boden mit weichen Sedimenthügeln */
+  fx.beginPath();
+  fx.moveTo(0,innerHeight+2);fx.lineTo(0,ridgeY(0,base));
+  for(let x=0;x<=innerWidth;x+=14)fx.lineTo(x,ridgeY(x,base));
+  fx.lineTo(innerWidth,innerHeight+2);fx.closePath();
+  const g=fx.createLinearGradient(0,base-30,0,innerHeight);
+  g.addColorStop(0,'rgba(26,34,44,0.95)');
+  g.addColorStop(0.25,'rgba(14,19,27,0.98)');
+  g.addColorStop(1,'rgba(4,6,10,1)');
+  fx.fillStyle=g;fx.fill();
+  fx.strokeStyle='rgba(140,175,200,0.22)';fx.lineWidth=1;fx.stroke();
+  /* Steine */
+  fx.fillStyle='rgba(8,12,18,0.9)';
+  rocks.forEach(r=>{
+    const x=r.x*innerWidth,y=ridgeY(x,base);
+    fx.beginPath();fx.ellipse(x,y+2,r.w*0.5,r.h*0.5,0,Math.PI,0);fx.fill();
+  });
+  /* Flohkrebse: huschen in kurzen Schüben über das Sediment */
+  pods.forEach(p=>{
+    if(t>p.next){p.v=(Math.random()-0.5)*90;p.next=t+0.6+Math.random()*2.4;}
+    p.x+=p.v*0.016;p.v*=0.94;
+    if(p.x<0)p.x=innerWidth;if(p.x>innerWidth)p.x=0;
+    const y=ridgeY(p.x,base)-3+Math.sin(t*7+p.ph)*1.5;
+    fx.fillStyle='rgba(215,230,240,0.55)';
+    fx.beginPath();fx.ellipse(p.x,y,3.1,1.6,Math.sin(t*3+p.ph)*0.3,0,7);fx.fill();
+  });
+}
+
+/* ---------- Blasen: steigen auf, wenn man schnell sinkt ---------- */
+const bubbles=[];
+function drawBubbles(t){
+  if(scrollV>14&&smoothDepth>5&&bubbles.length<60){
+    const n=Math.min(3,Math.floor(scrollV/26)+1);
+    for(let i=0;i<n;i++)bubbles.push({
+      x:Math.random()*innerWidth,y:innerHeight+10,
+      r:1.2+Math.random()*3.4,vy:1.2+Math.random()*2.2,
+      ph:Math.random()*9,life:1});
+  }
+  for(let i=bubbles.length-1;i>=0;i--){
+    const b=bubbles[i];
+    b.y-=b.vy+Math.max(0,scrollV)*0.15;
+    b.x+=Math.sin(t*3+b.ph)*0.6;
+    b.life-=0.004;
+    if(b.y<-20||b.life<=0){bubbles.splice(i,1);continue;}
+    fx.strokeStyle=`rgba(190,220,240,${0.35*b.life})`;fx.lineWidth=1;
+    fx.beginPath();fx.arc(b.x,b.y,b.r,0,7);fx.stroke();
+    fx.fillStyle=`rgba(230,245,255,${0.4*b.life})`;
+    fx.beginPath();fx.arc(b.x-b.r*0.35,b.y-b.r*0.35,b.r*0.25,0,7);fx.fill();
+  }
+}
+
+/* ---------- HUD ---------- */
+const el={
+  depth:document.getElementById('depthNum'),
+  vP:document.getElementById('vPress'),vT:document.getElementById('vTemp'),vL:document.getElementById('vLight'),
+  bP:document.getElementById('bPress'),bT:document.getElementById('bTemp'),bL:document.getElementById('bLight'),
+  zone:document.getElementById('zoneLabel'),prog:document.getElementById('progFill'),
+  hint:document.getElementById('hint'),intro:document.getElementById('intro'),ende:document.getElementById('ende'),
+  readout:document.getElementById('readout'),
+};
+function updateHUD(){
+  const d=smoothDepth;
+  el.depth.innerHTML=(d<0.5?'0':'−'+fmt(d))+'<small>M</small>';
+  const press=1+d/10;
+  el.vP.textContent=press.toLocaleString('de-DE',{maximumFractionDigits:0})+' bar';
+  el.bP.style.width=clamp(press/1094*100,0.5,100)+'%';
+  let temp;
+  if(d<200) temp=lerp(21,12,d/200);
+  else if(d<1000) temp=lerp(12,4,(d-200)/800);
+  else temp=lerp(4,1.5,clamp((d-1000)/9935,0,1));
+  el.vT.textContent=temp.toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1})+' °C';
+  el.bT.style.width=clamp(temp/21*100,2,100)+'%';
+  const light=Math.max(0,100*Math.exp(-d/38));
+  el.vL.textContent=(light>=0.5?Math.round(light):(d>0?'0':'100'))+' %';
+  el.bL.style.width=clamp(light,0,100)+'%';
+  let zone=ZONES[0];
+  for(const z of ZONES) if(d>=z.d) zone=z;
+  if(el.zone.textContent!==zone.name) el.zone.textContent=zone.name;
+  el.prog.style.height=(d/MAX_DEPTH*100)+'%';
+  el.hint.style.opacity=d>30?0:1;
+  el.intro.style.opacity=clamp(1-d/70,0,1);
+  el.intro.style.transform=`translateY(${-clamp(d/70,0,1)*60}px)`;
+  const atEnd=d>10820;
+  el.ende.classList.toggle('vis',atEnd);
+  el.readout.style.opacity=atEnd?0:1;
+}
+
+/* ---------- Audio (WebAudio, generativ) ---------- */
+let ac=null,audioOn=false,master=null,droneGain=null,pingTimer=null;
+const audioBtn=document.getElementById('audioBtn');
+function initAudio(){
+  ac=new (window.AudioContext||window.webkitAudioContext)();
+  master=ac.createGain();master.gain.value=0;master.connect(ac.destination);
+  /* Drohne: zwei verstimmte Oszillatoren + Tiefpass */
+  droneGain=ac.createGain();droneGain.gain.value=0.16;
+  const lp=ac.createBiquadFilter();lp.type='lowpass';lp.frequency.value=160;lp.Q.value=2;
+  droneGain.connect(lp);lp.connect(master);
+  [[48,'sine'],[48.35,'sine'],[96.2,'triangle']].forEach(([f,ty],i)=>{
+    const o=ac.createOscillator();o.type=ty;o.frequency.value=f;
+    const g=ac.createGain();g.gain.value=i===2?0.06:0.5;
+    o.connect(g);g.connect(droneGain);o.start();
+  });
+  /* Rauschen wie ferne Strömung */
+  const len=ac.sampleRate*2;
+  const nb=ac.createBuffer(1,len,ac.sampleRate);
+  const data=nb.getChannelData(0);
+  let l=0;for(let i=0;i<len;i++){l=l*0.97+(Math.random()*2-1)*0.03;data[i]=l*3;}
+  const ns=ac.createBufferSource();ns.buffer=nb;ns.loop=true;
+  const ng=ac.createGain();ng.gain.value=0.05;
+  ns.connect(ng);ng.connect(master);ns.start();
+  /* Sonar-Ping alle ~9 s */
+  function ping(){
+    if(!audioOn)return;
+    const o=ac.createOscillator();o.frequency.value=760;
+    const g=ac.createGain();
+    const dly=ac.createDelay();dly.delayTime.value=0.55;
+    const fb=ac.createGain();fb.gain.value=0.45;
+    g.gain.setValueAtTime(0.0001,ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.11,ac.currentTime+0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001,ac.currentTime+0.9);
+    o.connect(g);g.connect(master);g.connect(dly);dly.connect(fb);fb.connect(dly);dly.connect(master);
+    o.start();o.stop(ac.currentTime+1);
+  }
+  pingTimer=setInterval(ping,9000);
+  setTimeout(ping,600);
+}
+audioBtn.addEventListener('click',()=>{
+  if(!ac)initAudio();
+  ac.resume();
+  audioOn=!audioOn;
+  master.gain.linearRampToValueAtTime(audioOn?1:0,ac.currentTime+1.2);
+  audioBtn.textContent=audioOn?'Ton: an':'Ton: aus';
+});
+
+/* ---------- Auftauchen ---------- */
+document.getElementById('surfaceBtn').addEventListener('click',()=>{
+  const start=scrollY,t0=performance.now(),dur=6000;
+  function up(now){
+    const t=clamp((now-t0)/dur,0,1);
+    const e=1-Math.pow(1-t,3);
+    scrollTo(0,start*(1-e));
+    if(t<1)requestAnimationFrame(up);
+  }
+  requestAnimationFrame(up);
+});
+
+/* ---------- Hauptschleife ---------- */
+let t0=performance.now();
+function frame(now){
+  const t=(now-t0)/1000;
+  const sc=scrollY;
+  scrollV=sc-lastScroll;lastScroll=sc;
+  depth=clamp((sc-innerHeight)/PX_PER_M,0,MAX_DEPTH);
+  smoothDepth=lerp(smoothDepth,depth,0.08);
+  if(Math.abs(smoothDepth-depth)<0.05)smoothDepth=depth;
+
+  if(gl&&prog){
+    gl.uniform2f(uni.uRes,glc.width,glc.height);
+    gl.uniform1f(uni.uTime,t);
+    gl.uniform1f(uni.uDepth,smoothDepth);
+    gl.uniform1f(uni.uScroll,smoothDepth*PX_PER_M/innerHeight);
+    gl.uniform2f(uni.uMouse,mouse.x*DPR,mouse.y*DPR);
+    gl.uniform1f(uni.uLight,mouse.active);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+  }
+
+  fx.clearRect(0,0,innerWidth,innerHeight);
+  drawFish(t);
+  drawJelly(t);
+  drawWhale(t);
+  drawAngler(t);
+  drawSquid(t);
+  drawFloor(t);
+  drawBubbles(t);
+  drawSparks();
+  updateHUD();
+
+  /* Drohne dunkler/tiefer mit der Tiefe */
+  if(ac&&audioOn&&droneGain){
+    droneGain.gain.value=0.13+0.1*clamp(smoothDepth/4000,0,1);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

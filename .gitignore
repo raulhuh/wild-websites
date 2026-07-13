@@ -2,3 +2,8 @@
 node_modules/
 .netlify/
 *.log
+netlify.toml
+
+# Enthält echtes Fremd-Branding (Logo/Kontaktdaten Dritter) - nicht Teil des
+# öffentlichen Showcase-Repos, siehe Chat vom 2026-07-13.
+site-fight-academy/
