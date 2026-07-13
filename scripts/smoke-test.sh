@@ -16,7 +16,7 @@ curl -sS -X POST 'https://platform.higgsfield.ai/higgsfield-ai/soul/standard' \
 echo
 
 echo "== Netlify =="
-netlify status
+netlify status || true
 
 echo "== Playwright =="
 npx --yes playwright --version
