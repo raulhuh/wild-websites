@@ -9,9 +9,16 @@ description: 'Baut eine einzelne, technisch/visuell extreme Website nach der "Wi
 
 ## Voraussetzung
 
-Dieser Skill lebt in `/Users/raulszekely/Desktop/Programme/wild-websites/` und braucht die dortige Infrastruktur:
-`scripts/higgsfield.sh`, `scripts/screenshot.mjs`, `scripts/deploy.sh`, `.env` (OpenAI/Higgsfield-Keys), Netlify-CLI-Login.
-Falls einer dieser Bausteine fehlt: kurz melden statt zu raten, dann `docs/superpowers/plans/2026-07-13-wild-websites-plan.md` Tasks 1-4 nachholen.
+Dieser Skill braucht die Infrastruktur des Projektordners, in dem er liegt (relativ zum Skill: `../../../scripts/`,
+`../../../.env` — also die Ordner `scripts/` und die Datei `.env` im Wurzelverzeichnis dieses Projekts):
+`scripts/higgsfield.sh`, `scripts/screenshot.mjs`, `scripts/deploy.sh`, `scripts/setup-check.sh`, `.env` (OpenAI/Higgsfield-Keys), Netlify-CLI-Login.
+
+### Schritt 0 — Setup prüfen (immer zuerst)
+
+Vor JEDEM Durchlauf: `./scripts/setup-check.sh` im Projekt-Wurzelverzeichnis ausführen.
+- Wenn das Skript mit Exit-Code 0 durchläuft ("Alles bereit"): weiter mit Schritt 1.
+- Wenn `.env` fehlt oder Keys leer sind: dem Nutzer die fehlenden Punkte 1:1 aus der Skript-Ausgabe zeigen und auf `SETUP.md` im Projektordner verweisen (`cp .env.example .env`, dann Keys eintragen). NICHT versuchen, Keys zu erraten oder das Projekt trotzdem zu bauen — ohne Keys schlägt der Agent später mitten im Durchlauf fehl, das ist teurer als jetzt kurz zu stoppen.
+- Wenn Netlify nicht eingeloggt ist: dem Nutzer sagen, dass er `netlify login` einmalig ausführen muss (öffnet den Browser), dann selbst nicht weitermachen bis das erledigt ist.
 
 ## Input
 
@@ -42,7 +49,7 @@ Vor dem Bauen recherchieren (WebFetch/`ctx_fetch_and_index` auf die genannte URL
 
 Einen `Agent`-Tool-Aufruf mit `model: fable`, `subagent_type: general-purpose` starten (bei explizitem Wunsch nach mehreren Varianten: mehrere Aufrufe in einer Nachricht, gleiches Muster, verschiedene `site-<slug>-N/`-Ordner). Der Prompt muss enthalten:
 
-- Zielpfad `site-<slug>/index.html`, Arbeitsverzeichnis `/Users/raulszekely/Desktop/Programme/wild-websites`
+- Zielpfad `site-<slug>/index.html`, Arbeitsverzeichnis = das Projekt-Wurzelverzeichnis (dort wo `scripts/` und `.env` liegen — den absoluten Pfad davon im Dispatch-Prompt mitgeben, nicht raten oder fest verdrahten)
 - Bei echtem Unternehmen: alle recherchierten Fakten wörtlich mitgeben + explizites Fakten-nicht-erfinden-Gebot + Hinweis, ob es eine seriöse Business-Seite (klar lesbare Kernbotschaft, CTA, Kontakt) oder ein freies Kunstprojekt wird
 - Bei freiem Projekt: volle kreative Freiheit, keine Themenvorgabe außer dem Auftrag
 - `.env` laden: `set -a; source .env; set +a`

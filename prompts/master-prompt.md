@@ -1,6 +1,7 @@
 Du baust eine einzelne, radikal andersartige Website als Demonstration extremer
-Web-Design-Fähigkeiten. Ziel: `site-{{SITE_NUMBER}}/index.html` im Projektordner
-`/Users/raulszekely/Desktop/Programme/wild-websites/`.
+Web-Design-Fähigkeiten. Ziel: `site-{{SITE_NUMBER}}/index.html` im Projekt-
+Wurzelverzeichnis (dort wo `scripts/` und `.env` liegen — absoluten Pfad beim
+Dispatch mitgeben).
 
 FREIHEIT: Wähle Thema, Farben, Schriften, Layout, Techniken (3D via Three.js
 per CDN-Script-Tag, Shader, Partikel, Scroll-Animationen, generative Kunst,
